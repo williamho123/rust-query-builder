@@ -1,0 +1,7 @@
+[package]
+name = "query_builder"
+version = "0.1.0"
+authors = ["William Ho <awho168@gmail.com>"]
+edition = "2018"
+
+[dependencies]
