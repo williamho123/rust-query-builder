@@ -1,5 +1,5 @@
 [package]
-name = "query_builder"
+name = "tuna"
 version = "0.1.0"
 authors = ["William Ho <awho168@gmail.com>"]
 edition = "2018"
