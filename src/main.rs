@@ -3,7 +3,7 @@
 fn main() {
          let query = USERS
          .select((ID, LOGIN_COUNT))
-         .filter(ID.neq(1))
+         .filter(LOGIN_COUNT.is_not_null())
          .finish();
         println!("{:?}", query.sql);
 }
@@ -51,7 +51,7 @@ const ID: Column<UserTable, i64> = Column {
     _table_marker:  PhantomData,
 };
 
-const LOGIN_COUNT: Column<UserTable, Option<u64>> = Column {
+const LOGIN_COUNT: Column<UserTable, Option<i64>> = Column {
     name:     "login_count",
     position: 3,
     parse:    |s| s.parse().ok(),
@@ -84,6 +84,49 @@ impl ToSql for i64 {
     }
 }
 
+impl ToSql for String {
+    type Sql = String;
+    fn sql(&self) -> Self::Sql {
+        self.clone()
+    }
+}
+
+impl ToSql for f64 {
+    type Sql = f64;
+    fn sql(&self) -> Self::Sql {
+        *self
+    }
+}
+
+impl<T: ToSql + Clone> ToSql for Option<T> {
+    type Sql = OptionT<T>;
+    fn sql(&self) -> Self::Sql {
+        match self {
+            Some(a) => {
+                return OptionT {
+                    0: Some(a.clone()),
+                }
+            },
+            None => {
+                return OptionT{
+                    0: None,
+                }
+            }
+        }
+    }
+}
+
+pub struct OptionT<T: ToSql>(Option<T>);
+
+impl<T: ToSql> std::fmt::Display for OptionT<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match &self.0 {
+            Some(a) => a.sql().fmt(f),
+            None => write!(f, "NULL"),
+        }
+    }
+}
+
 /// Defines the types of things that can be projected from
 /// a source `Src` (probably a table).
 pub trait Projection<Src>: ToSql {
@@ -105,6 +148,16 @@ pub struct Equals<Src, Prj, Type> {
     source:     Src,
     projection: Prj,
     value:      Type,
+}
+
+pub struct IsNull<Src, Prj> {
+    source: Src,
+    projection: Prj,
+}
+
+pub struct IsNotNull<Src, Prj> {
+    source: Src,
+    projection: Prj,
 }
 
 pub struct Less<Src, Prj, Type> {
@@ -135,6 +188,38 @@ pub struct NotEq<Src, Prj, Type> {
     source:     Src,
     projection: Prj,
     value:      Type
+}
+
+impl<Src, Prj> ToSql for IsNull<Src, Prj>
+where
+    Src: ToSql,
+    Prj: Projection<Src>,
+{
+    type Sql = join::Join<sstr, (Src::Sql, sstr, Prj::Sql, sstr)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join {
+            sep: "",
+            tup: (self.source.sql(),     ".",
+                  self.projection.sql(), " IS NULL"),
+        }
+    }
+}
+
+impl<Src, Prj> ToSql for IsNotNull<Src, Prj>
+where
+    Src: ToSql,
+    Prj: Projection<Src>,
+{
+    type Sql = join::Join<sstr, (Src::Sql, sstr, Prj::Sql, sstr)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join {
+            sep: "",
+            tup: (self.source.sql(),     ".",
+                  self.projection.sql(), " IS NOT NULL"),
+        }
+    }
 }
 
 // How to turn an equality condition into SQL:
@@ -260,6 +345,22 @@ where
 
 }
 
+impl<Src, Prj> Condition<Src> for IsNull<Src, Prj>
+where
+    Src: ToSql,
+    Prj: Projection<Src>,
+{
+
+}
+
+impl<Src, Prj> Condition<Src> for IsNotNull<Src, Prj>
+where
+    Src: ToSql,
+    Prj: Projection<Src>,
+{
+
+}
+
 impl<Src, Prj, Type> Condition<Src> for Less<Src, Prj, Type>
 where
     Src: ToSql,
@@ -351,6 +452,20 @@ where
             source: Table::default(),
             projection: self,
             value: other,
+        }
+    }
+
+    pub fn is_null(self) -> IsNull<Table, Self> {
+        IsNull {
+            source: Table::default(),
+            projection: self,
+        }
+    }
+
+    pub fn is_not_null(self) -> IsNotNull<Table, Self> {
+        IsNotNull {
+            source: Table::default(),
+            projection: self,
         }
     }
 
