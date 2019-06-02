@@ -3,7 +3,7 @@
 fn main() {
          let query = USERS
          .select((ID, LOGIN_COUNT))
-         .filter(ID.equals(1))
+         .filter(ID.neq(1))
          .finish();
         println!("{:?}", query.sql);
 }
@@ -131,6 +131,12 @@ pub struct Geq<Src, Prj, Type> {
     value:      Type,
 }
 
+pub struct NotEq<Src, Prj, Type> {
+    source:     Src,
+    projection: Prj,
+    value:      Type
+}
+
 // How to turn an equality condition into SQL:
 impl<Src, Prj, Type> ToSql for Equals<Src, Prj, Type>
 where
@@ -226,8 +232,27 @@ where
     }
 }
 
-impl<Src, Prj, Type> Condition<Src> for Equals<Src, Prj, Type> 
-where 
+// How to turn an equality condition into SQL:
+impl<Src, Prj, Type> ToSql for NotEq<Src, Prj, Type>
+where
+    Src: ToSql,
+    Type: ToSql,
+    Prj: Projection<Src, Value = Type> {
+
+    type Sql = join::Join<sstr, (Src::Sql, sstr, Prj::Sql, sstr, Type::Sql, sstr)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join {
+            sep: "",
+            tup: (self.source.sql(),     ".",
+                  self.projection.sql(), " <> '",
+                  self.value.sql(),      "'"),
+        }
+    }
+}
+
+impl<Src, Prj, Type> Condition<Src> for Equals<Src, Prj, Type>
+where
     Src: ToSql,
     Type: ToSql,
     Prj: Projection<Src, Value = Type>,
@@ -235,8 +260,8 @@ where
 
 }
 
-impl<Src, Prj, Type> Condition<Src> for Less<Src, Prj, Type> 
-where 
+impl<Src, Prj, Type> Condition<Src> for Less<Src, Prj, Type>
+where
     Src: ToSql,
     Type: ToSql,
     Prj: Projection<Src, Value = Type>,
@@ -244,8 +269,8 @@ where
 
 }
 
-impl<Src, Prj, Type> Condition<Src> for Greater<Src, Prj, Type> 
-where 
+impl<Src, Prj, Type> Condition<Src> for Greater<Src, Prj, Type>
+where
     Src: ToSql,
     Type: ToSql,
     Prj: Projection<Src, Value = Type>,
@@ -253,8 +278,8 @@ where
 
 }
 
-impl<Src, Prj, Type> Condition<Src> for Leq<Src, Prj, Type> 
-where 
+impl<Src, Prj, Type> Condition<Src> for Leq<Src, Prj, Type>
+where
     Src: ToSql,
     Type: ToSql,
     Prj: Projection<Src, Value = Type>,
@@ -262,8 +287,17 @@ where
 
 }
 
-impl<Src, Prj, Type> Condition<Src> for Geq<Src, Prj, Type> 
-where 
+impl<Src, Prj, Type> Condition<Src> for Geq<Src, Prj, Type>
+where
+    Src: ToSql,
+    Type: ToSql,
+    Prj: Projection<Src, Value = Type>,
+{
+
+}
+
+impl<Src, Prj, Type> Condition<Src> for NotEq<Src, Prj, Type>
+where
     Src: ToSql,
     Type: ToSql,
     Prj: Projection<Src, Value = Type>,
@@ -271,7 +305,7 @@ where
 
 }
 /// use super::Equals;
-    
+
 /// Represents some column of table `Table` whose values convert to
 /// Rust type `Type`.
 ///
@@ -311,7 +345,7 @@ pub struct Column<Table, Type> {
 impl<Table, Type> Column<Table, Type>
 where
     Table: Selectable {
-    
+
     pub fn equals(self, other: Type) -> Equals<Table, Self, Type> {
         Equals {
             source: Table::default(),
@@ -346,6 +380,14 @@ where
 
     pub fn geq(self, other: Type) -> Geq<Table, Self, Type> {
         Geq {
+            source: Table::default(),
+            projection: self,
+            value: other,
+        }
+    }
+
+    pub fn neq(self, other: Type) -> NotEq<Table, Self, Type> {
+        NotEq {
             source: Table::default(),
             projection: self,
             value: other,
