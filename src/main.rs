@@ -6,6 +6,27 @@ fn main() {
          .filter(LOGIN_COUNT.is_not_null())
          .finish();
         println!("{:?}", query.sql);
+
+// let tst = ID.equals(1).and("hello");
+let tst = ID.equals(1);
+let tst2 = ID.equals(2);
+
+let tt = Both(tst, tst2);
+
+
+// let tst = ConditionChain {
+//     source: USERS,
+//     cond_type: ConditionChainType::Base,
+//     cond: ID.equals(2),
+//     next: None
+// };
+
+
+// ID.equals(1)
+//     .and(LOGIN_COUNT.geq(5).or(...))
+//     .or(NAME.like("William"))
+
+// (ID = 1 AND (LOGIN_COUNT >= 5)
 }
 
 // Used when some type needs to remember some other type
@@ -140,7 +161,125 @@ pub trait Projection<Src>: ToSql {
 /// The parameter is the source of the data for the condition, which
 /// prevents us from referring to columns that don't exist in the
 /// given query's source table.
-pub trait Condition<Src>: ToSql { }
+pub trait Condition<Src>: ToSql {
+    fn and(&self, cond: impl Condition<Src>) -> Box<dyn Condition<Src>> {
+        Both(self, cond)
+        // unimplemented!()
+    }
+}
+
+pub struct Both<A, B>(A, B);
+
+impl <Src, A, B> Condition<Src> for Both<A, B>
+where A: Condition<Src>, B: Condition<Src> { }
+
+impl<A, B> ToSql for Both<A, B>
+{
+    type Sql = String;
+
+    fn sql(&self) -> Self::Sql {
+
+        unimplemented!()
+    }
+}
+
+
+
+// pub struct Both<A, B>(A, B);
+// pub struct Either<A, B>(A, B);
+// pub struct Not<A>(A);
+
+// impl<Src, A, B> Condition<Src> for Both<A, B>
+// where A: Condition<Src>, B: Condition<Src> { }
+
+// impl<Src, A, B> Condition<Src> for Either<A, B>
+// where A: Condition<Src>, B: Condition<Src> { }
+
+// impl<Src, A> Condition<Src> for Not<A>
+// where A: Condition<Src> { }
+// pub trait ConditionChain<Src>: ToSql {}
+
+// pub struct BaseChain<Src, Cond, Nxt> {
+//     source: Src,
+//     condition: Cond,
+//     next: Option<Nxt>
+// }
+
+// impl<Src, Cond, Nxt> ConditionChain<Src> for BaseChain<Src, Cond, Nxt>
+// where
+//     Src: ToSql,
+//     Cond: Condition<Src>,
+//     Nxt: ConditionChain<Src> {
+
+// }
+
+// impl<Src, Cond, Nxt> ToSql for BaseChain<Src, Cond, Nxt>
+// where
+//     Src: ToSql,
+//     Cond: Condition<Src>,
+//     Nxt: ConditionChain<Src> {
+
+//     type Sql = String;
+
+//     fn sql(&self) -> Self::Sql {
+//         if let Some(ref nxt) = self.next {
+//             join::Join {
+//                 sep: "",
+//                 tup: (self.condition.sql(), "AND (",
+//                       nxt.sql(),            ")"),
+//             };
+//         } else {
+
+//         }
+
+//         return "".to_owned();
+
+//     }
+// }
+
+// pub struct AndChain<Src, Cond, Nxt> {
+//     source: Src,
+//     inner: BaseChain<Src, Cond, Nxt>,
+//     next: Option<Nxt>
+// }
+
+// pub struct OrChain {
+
+// }
+
+// pub enum ConditionChainType {
+//     Base,
+//     Or,
+//     And
+// }
+
+// pub struct ConditionChain<Src, Cond> {
+//     pub source: Src,
+//     pub cond: Cond,
+//     pub cond_type: ConditionChainType,
+//     pub next: Option<Box<ConditionChain<Src, Cond>>>
+// }
+
+// // impl<Cond> ConditionChain<Cond> {
+// //     pub fn and(&self, c: ConditionChain<Cond>) {
+
+// //     }
+// // }
+
+// impl<Src, Cond> ToSql for ConditionChain<Src, Cond>
+// where
+//     Src: ToSql,
+//     Cond: Condition<Src> {
+
+//     type Sql = String;
+
+//     fn sql(&self) -> Self::Sql {
+//         unimplemented!()
+//     }
+
+// }
+
+
 
 /// An example of a `Condition` to check equality on a column or
 /// other projection.
