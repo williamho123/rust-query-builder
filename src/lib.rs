@@ -45,7 +45,7 @@ impl ToSql for i64 {
 impl ToSql for String {
     type Sql = String;
     fn sql(&self) -> Self::Sql {
-        //TODO: add sanitization     
+        //TODO: add sanitization
         self.clone()
     }
 }
@@ -99,7 +99,94 @@ pub trait Projection<Src>: ToSql {
 /// The parameter is the source of the data for the condition, which
 /// prevents us from referring to columns that don't exist in the
 /// given query's source table.
-pub trait Condition<Src>: ToSql { }
+pub trait Condition<Src>: ToSql {
+    fn and<Other: Condition<Src>>(self, other: Other) -> Both<Self, Other>
+    where
+        Self: Sized {
+        Both(self, other)
+    }
+
+    fn or<Other: Condition<Src>>(self, other: Other) -> Either<Self, Other>
+    where
+        Self: Sized {
+        Either(self, other)
+    }
+
+    fn not(self) -> Not<Self>
+    where
+        Self: Sized {
+        Not(self)
+    }
+}
+
+impl <Src, A, B> Condition<Src> for Both<A, B>
+where
+    Src: ToSql,
+    A: Condition<Src>,
+    B: Condition<Src> { }
+
+impl<A, B> ToSql for Both<A, B>
+where
+    A: ToSql,
+    B: ToSql {
+
+    type Sql = join::Join<sstr, (A::Sql, sstr, B::Sql)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join{
+            sep: "",
+            tup: (self.0.sql(),
+                  " AND ",
+                  self.1.sql())
+        }
+    }
+}
+
+impl<Src, A, B> Condition<Src> for Either<A, B>
+where
+    Src: ToSql,
+    A: Condition<Src>,
+    B: Condition<Src> { }
+
+impl<A, B> ToSql for Either<A, B>
+where
+    A: ToSql,
+    B: ToSql {
+
+    type Sql = join::Join<sstr, (A::Sql, sstr, B::Sql)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join{
+            sep: "",
+            tup: (self.0.sql(),
+                  " OR ",
+                  self.1.sql())
+        }
+    }
+}
+
+impl<Src, A> Condition<Src> for Not<A>
+where
+    A: Condition<Src> { }
+
+impl<A> ToSql for Not<A>
+where
+    A: ToSql {
+
+    type Sql = join::Join<sstr, (sstr, A::Sql)>;
+
+    fn sql(&self) -> Self::Sql {
+        join::Join{
+            sep: "",
+            tup: ("NOT ",
+                  self.0.sql())
+        }
+    }
+}
+
+pub struct Both<A, B>(A, B);
+pub struct Either<A, B>(A, B);
+pub struct Not<A>(A);
 
 /// An example of a `Condition` to check equality on a column or
 /// other projection.
@@ -569,7 +656,7 @@ impl<Src, Prj, Cond> Filtered<Src, Prj, Cond>
 
 #[derive(Debug)]
 pub struct Query<Src, Prj> {
-    pub sql:        String,
+    pub sql:    String,
     conversion: Prj,
     _marker:    PhantomData<fn(&Src)>,
 }

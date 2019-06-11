@@ -1,25 +1,40 @@
 extern crate tuna;
+
 use std::marker::PhantomData;
-use tuna::{Column, Projection, Selected, ToSql, Selectable, sstr};
+use tuna::*;
+
+// #[derive(Tuna)]
+// struct UserTable {
+//    id: SqlType::Int
+//    login_count: SqlType::Nullable(SqlType::Int),
+//    name: SqlType::VarChar,
+// }
 
 fn main() {
-         let query = 
-         USERS.select((ID, LOGIN_COUNT))
-         .filter(NAME.equals("tov".to_owned()))
-         .finish();
-        println!("{:?}", query.sql);
+    let cond = ID.geq(5)
+        .and(LOGIN_COUNT.is_not_null().not());
+    let query = USERTABLE
+        .select((ID, LOGIN_COUNT))
+        .filter(cond)
+        .finish();
+
+    println!("{:?}", query.sql);
+    // let tst = ID.equals(5).and(LOGIN_COUNT.is_null());
+    // println!("{}", tst.sql());
 }
 
-///Example code
+/// Macro generated code
 #[derive(Default, Debug)]
 struct UserTable {
     id: PhantomData<fn(&i64)>,
     login_count: PhantomData<fn(&Option<i64>)>,
+    name: PhantomData<fn(&String)>,
 }
 
-const USERS: UserTable = UserTable {
+const USERTABLE: UserTable = UserTable {
     id: PhantomData,
     login_count: PhantomData,
+    name: PhantomData
 };
 
 const ID: Column<UserTable, i64> = Column {
