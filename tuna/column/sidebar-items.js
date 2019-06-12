@@ -1,0 +1,1 @@
+initSidebarItems({"struct":[["Column","Represents some column of a table whose values convert to a Rust type. The column keeps track of the data source (table) through the use of `PhantomData`."]]});
