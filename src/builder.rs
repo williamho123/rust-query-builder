@@ -1,3 +1,42 @@
+//! Builder library.
+//!
+//! This module is the main mechanism through which a user can build queries. It defines
+//! the beginning, chaining, and finishing of a query. All other modules from this crate
+//! are re-exported to allow for ease of access.
+//!
+//! For example, suppose that there is a table type
+//! `UserTable: Selectable`, with these two fields:
+//!
+//!   - `id` is a SQL `INTEGER NOT NULL`
+//!   - `login_count` is a SQL `INTEGER`
+//!
+//! ```
+//! const USERS: UserTable = UserTable;
+//!
+//! const ID: Column<UserTable, i64> = Column {
+//!     name:     "id",
+//!     position: 0,
+//!     parse:    |s| s.parse().unwrap(),
+//!     _marker:  PhantomData,
+//! };
+//!
+//! const LOGIN_COUNT: Column<UserTable, Option<u64>> = Column {
+//!     name:     "login_count",
+//!     position: 3,
+//!     parse:    |s| s.parse().ok(),
+//!     _marker:  PhantomData,
+//! };
+//! ```
+//!
+//! Then a query would be constructed like so:
+//! ```
+//! let query = USERS
+//!     .select((ID, LOGIN_COUNT))
+//!     .filter(ID.geq(5)
+//!               .and(LOGIN_COUNT.not_null()))
+//!     .finish();
+//! ```
+
 pub use super::{
     common::*,
     column::*,
@@ -9,7 +48,7 @@ pub use super::{
 use std::marker::PhantomData;
 
 /// Things that can be selected from. (Each table would
-/// define its own type that implements this.
+/// define its own type that implements this).
 pub trait Selectable: ToSql + Default + Sized {
     /// Begins a query by providing the desired projection.
     /// This can be a tuple of fields for a particular table,
@@ -29,7 +68,7 @@ impl<Src, Prj> Selected<Src, Prj> {
     /// Filters a selection by some given condition.
     pub fn filter<Cond>(self, condition: Cond) -> Filtered<Src, Prj, Cond>
     where
-        Cond: Condition<Src>, {
+        Cond: Condition<Src> {
 
         Filtered {
             source:     self.source,
@@ -39,49 +78,22 @@ impl<Src, Prj> Selected<Src, Prj> {
     }
 }
 
-/// The result of applying filtering.
+/// The result of applying filtering. The query at this
+/// point is `SELECT self.projection FROM self.source WHERE self.condition`.
 pub struct Filtered<Src, Prj, Cond> {
     source:     Src,
     projection: Prj,
     condition:  Cond,
 }
 
-impl<Src, Prj, Cond> Filtered<Src, Prj, Cond>
-{
+impl<Src, Prj, Cond> Filtered<Src, Prj, Cond> {
     /// Finishes constructing a query.
-    ///
-    /// ```
-    /// use super::Equals;
-    ///
-    /// struct UserTable;
-    ///
-    /// const USERS: UserTable = UserTable;
-    ///
-    /// const ID: Column<UserTable, i64> = Column {
-    ///     name:     "id",
-    ///     position: 0,
-    ///     parse:    |s| s.parse().unwrap(),
-    ///     _marker:  Default::default(),
-    /// };
-    ///
-    /// const LOGIN_COUNT: Column<UserTable, Option<u64>> = Column {
-    ///     name:     "login_count",
-    ///     position: 3,
-    ///     parse:    |s| s.parse().ok(),
-    ///     _marker:  Default::default(),
-    /// };
-    ///
-    /// let query = USERS
-    ///     .select::<(ID, LOGIN_COUNT)>()
-    ///     .filter(LOGIN_COUNT.equals(Some(1)))
-    ///     .finish();
-    /// ```
     pub fn finish(self) -> Query<Src, Prj>
     where
         Src: Selectable,
         Prj: Projection<Src>,
-        Cond: Condition<Src>,
-    {
+        Cond: Condition<Src> {
+
         let sql = format!("SELECT {} FROM {} WHERE {}",
                           self.projection.sql(),
                           self.source.sql(),
@@ -98,7 +110,6 @@ impl<Src, Prj, Cond> Filtered<Src, Prj, Cond>
 /// A query that’s ready to execute. It no longer stores any data
 /// pointing to the source table, but it’s still tied by type so that
 /// you can only execute it on a connection that has that table.
-
 #[derive(Debug)]
 pub struct Query<Src, Prj> {
     pub sql:    String,

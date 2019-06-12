@@ -1,3 +1,9 @@
+//! Common taits and implementations.
+//!
+//! This module contains general traits and implementations that apply to other modules.
+//! Notably, macros to generate selection and display code for tuples are included here.
+
+/// A type representing a `str` with static lifetime.
 #[allow(non_camel_case_types)]
 pub type sstr = &'static str;
 
@@ -14,14 +20,41 @@ pub trait ToSql {
 }
 
 /// Defines the types of things that can be projected from
-/// a source `Src` (probably a table).
+/// a source `Src` (most often a table).
 pub trait Projection<Src>: ToSql {
-    /// The type that the projected thing gets in Rust. See
-    /// `Column` below for an example of where this comes from.
+    /// The type that the projected thing gets in Rust.
     type Value;
 }
 
-//impl ToSql for all possible rust data types
+/// A wrapper around an `Option` of a type `T` to allow for custom
+/// trait implementations on `Option<T>` (specifically `ToSql`).
+pub struct OptionT<T: ToSql>(Option<T>);
+
+impl<T> ToSql for Option<T>
+where
+    T: ToSql + Clone {
+
+    type Sql = OptionT<T>;
+
+    fn sql(&self) -> Self::Sql {
+        match self {
+            Some(a) => OptionT(Some(a.clone())),
+            None => OptionT(None)
+        }
+    }
+}
+
+impl<T: ToSql> std::fmt::Display for OptionT<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
+        match &self.0 {
+            Some(a) => a.sql().fmt(f),
+            None => write!(f, "NULL"),
+        }
+    }
+}
+
+// impl ToSql for all possible rust data types.
+
 impl ToSql for i64 {
     type Sql = i64;
     fn sql(&self) -> Self::Sql {
@@ -44,38 +77,11 @@ impl ToSql for f64 {
     }
 }
 
-impl<T: ToSql + Clone> ToSql for Option<T> {
-    type Sql = OptionT<T>;
-    fn sql(&self) -> Self::Sql {
-        match self {
-            Some(a) => {
-                return OptionT {
-                    0: Some(a.clone()),
-                }
-            },
-            None => {
-                return OptionT{
-                    0: None,
-                }
-            }
-        }
-    }
-}
-
-pub struct OptionT<T: ToSql>(Option<T>);
-
-impl<T: ToSql> std::fmt::Display for OptionT<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> Result<(), std::fmt::Error> {
-        match &self.0 {
-            Some(a) => a.sql().fmt(f),
-            None => write!(f, "NULL"),
-        }
-    }
-}
-
+/// This module represents something that can be `join`ed together to be displayed.
 pub mod join {
     use std::fmt::{Display, Formatter, Result};
 
+    /// Something that can be joined together with a specified separator.
     pub struct Join<Sep, Tup> {
         pub sep: Sep,
         pub tup: Tup,
@@ -93,6 +99,7 @@ pub mod join {
     }
 }
 
+/// Allows selection of tuples like (A. B), (A, B, C), (A, B, C, D) ...
 macro_rules! impl_projection_for_tuple {
     ($($tv:ident),* $(,)?) => {
         impl<Src, $($tv),*> $crate::common::Projection<Src> for ($($tv,)*)
@@ -138,6 +145,7 @@ apply_macro_for_tuples! {
     }
 }
 
+/// Allows tuples represented as `Join`s to be displayed.
 macro_rules! impl_display_join_for_tuple {
     ($tv1:ident $(, $tv:ident)* $(,)?) => {
         impl<Sep, $tv1 $(,$tv)*> ::std::fmt::Display
@@ -166,6 +174,7 @@ apply_macro_for_tuples! {
         D E F G H I J K L M N O P Q R S T U V W X Y Z
     }
 }
+
 
 // The following impls let you select tuples.
 

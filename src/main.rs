@@ -3,6 +3,19 @@ extern crate tuna;
 use std::marker::PhantomData;
 use tuna::builder::*;
 
+fn main() {
+
+    let query = USERTABLE
+        .select((ID, LOGIN_COUNT))
+        .filter(ID.geq(1)
+                  .and(LOGIN_COUNT.less_than(Some(5))
+                  .and(NAME.equals("tuna".to_owned()))))
+        .finish();
+
+    println!("{:?}", query.sql);
+}
+
+// The user would only need to define something like this.
 // #[derive(Tuna)]
 // struct UserTable {
 //    id: SqlType::Int
@@ -10,20 +23,7 @@ use tuna::builder::*;
 //    name: SqlType::VarChar,
 // }
 
-fn main() {
-    let cond = ID.geq(5)
-        .and(LOGIN_COUNT.is_not_null().not());
-    let query = USERTABLE
-        .select((ID, LOGIN_COUNT))
-        .filter(cond)
-        .finish();
-
-    println!("{:?}", query.sql);
-    // let tst = ID.equals(5).and(LOGIN_COUNT.is_null());
-    // println!("{}", tst.sql());
-}
-
-/// Macro generated code
+// Macro generated code all below here.
 #[derive(Default, Debug)]
 struct UserTable {
     id: PhantomData<fn(&i64)>,
