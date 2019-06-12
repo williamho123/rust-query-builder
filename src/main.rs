@@ -1,7 +1,7 @@
 extern crate tuna;
 
 use std::marker::PhantomData;
-use tuna::*;
+use tuna::builder::*;
 
 // #[derive(Tuna)]
 // struct UserTable {
